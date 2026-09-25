@@ -12,14 +12,18 @@ Handles routing + HTTP responses. Built on `tokio` + `hyper` + `tower`.
 |------|-----------|------------------|
 | `Router` | Holds the URL map | `Router::new()` makes empty router; `.route(path, method)` registers a path |
 | `routing::get` | Wraps a handler as "HTTP GET only" | `get(hello)` — pass function as value, no `()` |
+| `routing::post` | Wraps a handler as "HTTP POST only" (wrong verb → `405`) | `post(echo)` |
 | `axum::serve` | Runs the server forever | `axum::serve(listener, app).await` — takes socket + router, never returns unless it crashes |
 | `axum::Json` | Wrapper turning a struct into `application/json` + `200 OK` | `Json(MyStruct { ... })` — inner type must impl `Serialize` |
+| `extract::Path` | Pulls a route capture (`{id}`) into a typed arg; bad parse → `400` | `Path(id): Path<u32>` — route must declare `{id}` (axum 0.8 syntax, not `:id`) |
+| `extract::Query` | Parses `?key=val` into a struct; missing field → `422` unless `#[serde(default)]` | `Query(q): Query<UserQuery>` |
 
 ### `serde = "1"` (feature `derive`) + `serde_json = "1"` — serialization
 
 | Item | What it is | Syntax it brings |
 |------|-----------|------------------|
 | `Serialize` | Trait (interface) meaning "can be converted to JSON" | `use serde::Serialize;` + `#[derive(Serialize)]` on struct |
+| `Deserialize` | Trait meaning "can be built from JSON" (request bodies) | `#[derive(Deserialize)]`; `Json(payload): Json<EchoMsg>` extractor auto-rejects bad bodies with `422` |
 | `#[derive(Serialize)]` | Auto-writes the struct→JSON mapping | Place directly above `struct` definition |
 
 ### `std::time` + `tokio::time` — async sleep (`/sleep`)

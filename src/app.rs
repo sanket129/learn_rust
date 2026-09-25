@@ -6,6 +6,7 @@ use crate::handlers::sleep::sleep_hello;
 use crate::handlers::sleep_blocking::sleep_blocking_hello;
 use crate::handlers::cpu::cpu_hello;
 use crate::handlers::echo::echo;
+use crate::handlers::user::user;
 
 pub fn create_router() -> Router {
     Router::new()
@@ -15,4 +16,5 @@ pub fn create_router() -> Router {
         .route("/greet", get(hello))
         .route("/json", get(json_hello))
         .route("/echo", post(echo))
+        .route("/users/{id}", get(user))
 }
