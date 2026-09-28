@@ -5,3 +5,5 @@ pub mod sleep_blocking;
 pub mod cpu;
 pub mod echo;
 pub mod user;
+pub mod auth;
+
