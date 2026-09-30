@@ -52,6 +52,50 @@ features so we don't pick them one by one (macros, runtime, networking…).
 | `#[tokio::main]` | Attribute macro: generates a hidden normal `main` that builds the runtime and runs your `async main` inside it | `#[tokio::main(flavor = "current_thread")]` — flavors: `current_thread` (1 OS thread, our baseline), `multi_thread` (default, one thread per core), `local` |
 | `tokio::net::TcpListener` | Async TCP socket waiting for connections | `TcpListener::bind("127.0.0.1:3000").await` — `bind` returns a Future, `.await` waits for the OS |
 
+### `jsonwebtoken = "9"` — JWT issue + verify (`/login`)
+
+| Item | What it is | Syntax it brings |
+|------|-----------|------------------|
+| `Header::default()` | Token header; default = HS256 (HMAC-SHA256, symmetric) | `encode(&Header::default(), &claims, &key)` |
+| `EncodingKey` | The signing key, built from raw secret bytes | `EncodingKey::from_secret(SECRET)` — `SECRET` is `&[u8]` |
+| `encode` | Signs claims → a `xxx.yyy.zzz` token String | `encode(...)` returns `Result<String, Error>` |
+| `DecodingKey` | The verifying key — same secret for HS256 | `DecodingKey::from_secret(SECRET)` |
+| `Validation::default()` | Which checks to enforce on decode | `decode::<Claims>(token, &key, &Validation::default())` |
+| `decode` | Verifies signature **and** `exp`; returns the claims back | `decode::<Claims>(...)` → `Result<TokenData<Claims>, Error>` |
+
+A JWT is three base64url parts: `header.payload.signature`. Only the payload is
+readable; the signature is what proves it wasn't tampered with. Verification never
+trusts the payload — it re-signs and compares.
+
+### `chrono = "0.4"` — dates & durations (token expiry)
+
+| Item | What it is | Syntax it brings |
+|------|-----------|------------------|
+| `Utc::now()` | Current UTC time | `(Utc::now() + Duration::hours(1)).timestamp()` |
+| `Duration` | A span of time (hours/minutes/days) | `Duration::hours(1)`, `Duration::minutes(30)` |
+| `.timestamp()` | Seconds since the Unix epoch (1970-01-01) | returns `i64`; `as usize` for the claim |
+
+### `dotenvy = "0.15"` — load `.env` into the environment
+
+| Item | What it is | Syntax it brings |
+|------|-----------|------------------|
+| `dotenvy::dotenv()` | Reads `.env` and sets each key as a process env var | `dotenvy::dotenv().ok();` — must run **first** in `main`, before anything reads a var. `.ok()` swallows "no .env" |
+| `std::env::var` | Read one env var by name (**not** `getenv` — that's C) | `std::env::var("JWT_SECRET")` → `Result<String, VarError>` |
+
+Rust has no built-in `.env` support. The file is just text until something loads
+it — `dotenvy` is that something. `.env` is gitignored so real secrets never
+enter git; `.env.example` (committed) documents which keys are needed.
+
+### `std::sync::LazyLock` — a global that can read the environment
+
+| Item | What it is | Syntax it brings |
+|------|-----------|------------------|
+| `const` | Compile-time constant, inlined at every use site | `const SECRET: &[u8] = b"..."` — **can never read the environment**, because the value is fixed before the program runs |
+| `static` | A single global living for the whole program, stored in memory | `static SECRET: LazyLock<Vec<u8>> = ...` |
+| `LazyLock::new` | Takes a closure, runs it **once** on first access, caches the result | `LazyLock::new(\|\| { ... })` — the escape hatch for "global whose value isn't known until runtime" |
+| deref | Accessing a `LazyLock` transparently yields the value inside | `SECRET.as_slice()` / `&SECRET` gives the `Vec<u8>` |
+
+
 ## Rust syntax / keywords met so far
 
 | Syntax | Meaning |
@@ -64,9 +108,28 @@ features so we don't pick them one by one (macros, runtime, networking…).
 | `-> &'static str` | Return type (compulsory, checked at compile time). `&'static str` = borrowed text living for the whole program (`"hello"` is baked into the binary). `axum` converts it into a `200 OK` response |
 | `.unwrap()` | On a `Result`: if `Ok`, give the value; if `Err`, crash (panic). OK for learning, never for prod. Rust has no exceptions — fallible ops return `Result<Ok, Err>` |
 | `#[...]` | Attribute (macro) — code that rewrites the item below it at compile time |
+| `mod name;` | Declares a module = a sibling file. **A `.rs` file nobody declares is never compiled** — green `cargo check` proves only that what you declared is valid |
+| `Result<T, E>` | Rust's error handling; no exceptions, no `try`/`catch` | `?` after a fallible call: on `Ok` bind the value, on `Err` return early from the function |
+| `.ok_or(...)` / `.map_err(...)` | Convert an error into the type your function returns | `.map_err(\|e\| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?` |
+| `.parse()` | String → number, fallibly | `"42".parse::<u32>()` → `Result<u32, _>`; `?` or `.unwrap()` to use it |
 
 ## Project notes
 
 - Bind `127.0.0.1:3000` = loopback only (same machine). `0.0.0.0:3000` = all interfaces (needed for LAN/phone access). `192.168.1.1` is the router, not your machine.
 - Always load-test with `cargo run --release` (debug builds are unoptimised).
 - Load tester: `oha` (external binary, `cargo install oha`) — the autocannon equivalent.
+- **Division of labour:** Sanket writes the Rust source; the assistant writes the docs and the `// Lesson:` comment headers.
+- Generate a signing secret with `openssl rand -hex 32` (256 bits). Never reuse one secret across environments, and never commit a real one.
+
+## Gotchas hit so far (each one cost a build)
+
+| Gotcha | What happened | Rule |
+|--------|---------------|------|
+| `Path` vs `path` | `use axum::extract::path` → `cannot find tuple struct Path` | Rust is case-sensitive, always |
+| `http:StatusCode` | Single colon in a `use` path | Paths use `::` |
+| `:id` vs `{id}` | Axum 0.8 **panics at startup** on `:id` | 0.8 uses `{id}`; compiles fine, crashes on run |
+| `/user` vs `/users` | Route and curl disagreed → `404` with an empty body | A 404 means the exact path+verb doesn't exist |
+| Undeclared `mod` | A new file with errors still gave green `cargo check` | Add `mod name;` or the file is invisible to the compiler |
+| `b"str".to_string()` | Byte literals don't implement `Display` | Use `"str"` unless you specifically want bytes |
+| `str.to_string` | Method without `()` | Rust requires the call parentheses |
+| `Path` vs `Json` errors | `400` for a bad URL segment, `422` for a bad body | URL parsing fails before body parsing |
