@@ -1,8 +1,14 @@
+// Lesson: POST /login issues a JWT. The API takes a numeric `user_id` but RFC
+// 7519 defines the `sub` claim as a string, so the conversion happens here at
+// the signing boundary. Returns Result so a signing failure surfaces as a 500
+// rather than a panic; `exp` is one hour out and jsonwebtoken enforces it when
+// a token is later decoded.
+
+use crate::auth::SECRET;
 use axum::{Json, http::StatusCode};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
-use crate::auth::SECRET;
 
 
 #[derive(Deserialize)]

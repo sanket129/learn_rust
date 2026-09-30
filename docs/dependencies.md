@@ -1,7 +1,8 @@
 # Dependencies, modules & syntax used so far
 
 Living doc — extend it every time we add a crate or use a new item.
-(Project goal: Rust APIs + load testing. Single-threaded baseline first.)
+(Original goal was Rust APIs + load testing; the single-threaded baseline is
+done and the project has since pivoted — see `roadmap.md` for what's next.)
 
 ## Crates (`Cargo.toml`)
 

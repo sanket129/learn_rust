@@ -1,3 +1,7 @@
+// Lesson: process entry point; order matters. The `mod` lines declare sibling
+// files — a .rs file nobody declares is never compiled at all. `#[tokio::main]`
+// builds the async runtime that runs the body, and dotenvy must load .env
+// before any code reads an env var (the secret in src/auth.rs does).
 mod app;
 mod handlers;
 mod auth;

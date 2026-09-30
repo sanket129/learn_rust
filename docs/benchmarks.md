@@ -133,3 +133,15 @@ Takeaway: THE payoff number. 7.5x ≈ your core count — compute scales with
 threads, almost linearly. Compare the trilogy: `/greet` +7.5% (nothing to
 parallelize), `/sleep` 0% (waiting overlaps on 1 thread), `/cpu` +650%
 (work splits across cores). Flip back to `multi_thread` now.
+
+## Status
+
+`main.rs` is back on `flavor = "multi_thread"` as of commit `6dd4931`, so runs
+6 and 7 reflect the shipping configuration.
+
+The concurrency arc is closed. Later work (JWT auth, then the document search
+app) is not benchmarked yet — but note that `/cpu` is already the most
+interesting endpoint to load test, because anything added to a request path
+(embedding a query, computing cosine similarity) lands in the same
+compute-bound category and will behave like `/cpu`, not like `/greet`.
+

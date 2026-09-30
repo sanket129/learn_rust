@@ -1,4 +1,7 @@
 // Lesson: route map. One .route() line per endpoint, no handlers here.
+// Watch the `{id}` capture on /users — axum 0.8 replaced 0.7's `:id`, and the old
+// form compiles fine then panics at startup. Path and verb must both match what
+// the client sends, or you get a 404 with an empty body.
 use axum::{Router,routing::{get, post}};
 use crate::handlers::hello::hello;
 use crate::handlers::json::json_hello;
