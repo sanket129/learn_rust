@@ -11,6 +11,7 @@ use crate::handlers::cpu::cpu_hello;
 use crate::handlers::echo::echo;
 use crate::handlers::user::user;
 use crate::handlers::auth::login;
+use crate::handlers::me::me;
 
 pub fn create_router() -> Router {
     Router::new()
@@ -22,4 +23,5 @@ pub fn create_router() -> Router {
         .route("/echo", post(echo))
         .route("/users/{id}", get(user))
         .route("/login", post(login))
+        .route("/me", get(me))
 }

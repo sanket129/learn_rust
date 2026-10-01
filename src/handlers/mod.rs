@@ -8,4 +8,5 @@ pub mod cpu;
 pub mod echo;
 pub mod user;
 pub mod auth;
+pub mod me;
 

@@ -24,6 +24,7 @@ Always `cargo run --release` before load testing — debug builds are unoptimise
 | POST | `/echo` | `echo` | `Deserialize` a body; extractors reject bad input with `4xx` |
 | GET | `/users/{id}` | `user` | `Path` + `Query` extractors, `#[serde(default)]` |
 | POST | `/login` | `login` | issues an HMAC-signed JWT, secret from `.env` |
+| GET | `/me` | `me` | protected — the `AuthUser` extractor verifies the token |
 | GET | `/sleep` | `sleep_hello` | `tokio::time::sleep` — yields the thread |
 | GET | `/sleep_block` | `sleep_blocking_hello` | `std::thread::sleep` — the antipattern |
 | GET | `/cpu` | `cpu_hello` | CPU-bound work; this is where threads pay off |
@@ -33,7 +34,13 @@ Try it:
 ```sh
 curl http://127.0.0.1:3000/greet
 curl "http://127.0.0.1:3000/users/42?active=true"
-curl -X POST http://127.0.0.1:3000/login -H 'Content-Type: application/json' -d '{"user_id":42}'
+
+# auth round trip
+TOKEN=$(curl -s -X POST http://127.0.0.1:3000/login \
+  -H 'Content-Type: application/json' -d '{"user_id":42}' \
+  | sed -E 's/.*"token":"([^"]+)".*/\1/')
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3000/me   # {"user_id":42}
+curl http://127.0.0.1:3000/me                                     # 401 — no token
 ```
 
 Load test:

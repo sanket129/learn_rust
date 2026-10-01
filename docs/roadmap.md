@@ -9,8 +9,10 @@ conclusion: threads only matter when there's work to spread across them.
 `/greet` gained nothing, `/sleep` gained nothing (waits already overlap),
 `/cpu` gained 650% because compute is the one thing a thread genuinely holds.
 
-JWT auth is half built. Token *issuing* works end to end; token *verification*
-does not exist yet, so `POST /login` currently hands out a token nothing checks.
+JWT auth is working end to end: `POST /login` issues a token, `GET /me` verifies
+it and answers with the caller's `sub`. The missing header, the wrong prefix and
+a garbage token all return `401`; there is no auth check in the `/me` body at
+all, because taking `AuthUser` *is* the check.
 
 ## Auth, remaining
 
@@ -20,9 +22,10 @@ does not exist yet, so `POST /login` currently hands out a token nothing checks.
 | Secret from `.env` via `LazyLock` (not a `const`) | done |
 | `sub` as a JSON string per RFC 7519 | done |
 | `Claims` returned inside the token | done |
-| **Round-trip test** (`cargo test` has never run here) | todo |
-| **`AuthUser` extractor** — a `FromRequestParts` impl that reads `Authorization: Bearer`, verifies signature + expiry, rejects with `401` | todo |
-| **`GET /me`** — a protected route reading the `sub` claim | todo |
+| **Round-trip test** — encode→decode, wrong-secret rejection, expiry rejection | done (3 tests) |
+| **`AuthUser` extractor** — a `FromRequestParts` impl that reads `Authorization: Bearer`, verifies signature + expiry, rejects with `401` | done |
+| **`GET /me`** — a protected route reading the `sub` claim | done |
+| Password hashing (`argon2`/`bcrypt`) so `/login` stops trusting any `user_id` | todo |
 | **Move routes under `/api/*`** | todo |
 
 The extractor is the interesting part: putting the check in the handler

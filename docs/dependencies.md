@@ -18,6 +18,27 @@ Handles routing + HTTP responses. Built on `tokio` + `hyper` + `tower`.
 | `axum::Json` | Wrapper turning a struct into `application/json` + `200 OK` | `Json(MyStruct { ... })` — inner type must impl `Serialize` |
 | `extract::Path` | Pulls a route capture (`{id}`) into a typed arg; bad parse → `400` | `Path(id): Path<u32>` — route must declare `{id}` (axum 0.8 syntax, not `:id`) |
 | `extract::Query` | Parses `?key=val` into a struct; missing field → `422` unless `#[serde(default)]` | `Query(q): Query<UserQuery>` |
+| `extract::FromRequestParts` | Trait you implement to make your own type an extractor | `impl<S: Send + Sync> FromRequestParts<S> for AuthUser` — reads headers only, so a handler can *also* take a `Json` body (use `FromRequest` only if you need the body) |
+| `http::request::Parts` | The headers half of a request, handed to your extractor | `parts.headers.get("Authorization")` |
+
+### Writing a custom extractor
+
+A handler argument that implements `FromRequestParts` becomes an extractor: axum
+runs it *before* the handler body, and on `Err` it sends your `Rejection` and
+never calls the handler. This is why `AuthUser` is better than an
+`if let Some(user) = check_token(...)` guard in the body — the check is part of
+the signature, so a route cannot forget it.
+
+```rust
+impl<S: Send + Sync> FromRequestParts<S> for AuthUser {
+    type Rejection = (StatusCode, String);   // you choose status AND body
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> { ... }
+}
+```
+
+Order matters: axum runs extractors left-to-right and stops at the first
+failure, so put cheap rejections (missing header) before expensive ones
+(signature verification).
 
 ### `serde = "1"` (feature `derive`) + `serde_json = "1"` — serialization
 
@@ -111,6 +132,9 @@ enter git; `.env.example` (committed) documents which keys are needed.
 | `#[...]` | Attribute (macro) — code that rewrites the item below it at compile time |
 | `mod name;` | Declares a module = a sibling file. **A `.rs` file nobody declares is never compiled** — green `cargo check` proves only that what you declared is valid |
 | `Result<T, E>` | Rust's error handling; no exceptions, no `try`/`catch` | `?` after a fallible call: on `Ok` bind the value, on `Err` return early from the function |
+| `impl Trait for Type` | Implement a trait (interface) on your own type | `impl<S: Send + Sync> FromRequestParts<S> for AuthUser` — this is what turns a struct into an extractor |
+| `<S: Send + Sync>` | Generic parameter with a bound: usable across async threads | Needed on extractor impls because axum calls them from any worker thread |
+| `async fn` in a trait impl | The trait requires an async fn, so the impl is too | `async fn from_request_parts(...) -> Result<Self, Self::Rejection>` |
 | `.ok_or(...)` / `.map_err(...)` | Convert an error into the type your function returns | `.map_err(\|e\| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?` |
 | `.parse()` | String → number, fallibly | `"42".parse::<u32>()` → `Result<u32, _>`; `?` or `.unwrap()` to use it |
 

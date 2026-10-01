@@ -60,6 +60,26 @@ mod tests {
     }
 
     #[test]
+    fn expired_token_is_rejected() {
+        let expired = Claims {
+            sub: "42".to_string(),
+            exp: (Utc::now() - Duration::hours(1)).timestamp() as usize,
+        };
+        let token = encode(
+            &Header::default(),
+            &expired,
+            &EncodingKey::from_secret(&SECRET),
+        )
+        .unwrap();
+        let result = decode::<Claims>(
+            &token,
+            &DecodingKey::from_secret(&SECRET),
+            &Validation::default(),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn token_signed_with_another_secret_is_rejected() {
         let other = EncodingKey::from_secret(b"a completely different secret");
         let token = encode(&Header::default(), &valid_claims(), &other).unwrap();
