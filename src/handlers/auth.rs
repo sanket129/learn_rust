@@ -33,3 +33,48 @@ pub async fn login(Json(req): Json<LoginReq>) -> Result<Json<LoginRes>, (StatusC
     let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(&SECRET)).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(LoginRes { token }))
 }
+
+// Tests live here rather than in src/auth.rs because they use `use super::*`,
+// and only this module imports Claims / encode / Header / EncodingKey / Utc.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jsonwebtoken::{DecodingKey, Validation, decode};
+
+    fn valid_claims() -> Claims {
+        Claims {
+            sub: "42".to_string(),
+            exp: (Utc::now() + Duration::hours(1)).timestamp() as usize,
+        }
+    }
+
+    #[test]
+    fn token_round_trips() {
+        let token = encode(
+            &Header::default(),
+            &valid_claims(),
+            &EncodingKey::from_secret(&SECRET),
+        )
+        .unwrap();
+        let decoded = decode::<Claims>(
+            &token,
+            &DecodingKey::from_secret(&SECRET),
+            &Validation::default(),
+        )
+        .unwrap();
+        assert_eq!(decoded.claims.sub, "42");
+    }
+
+    #[test]
+    fn token_signed_with_another_secret_is_rejected() {
+        let other = EncodingKey::from_secret(b"a completely different secret");
+        let token = encode(&Header::default(), &valid_claims(), &other).unwrap();
+        let result = decode::<Claims>(
+            &token,
+            &DecodingKey::from_secret(&SECRET),
+            &Validation::default(),
+        );
+        assert!(result.is_err());
+    }
+}
+

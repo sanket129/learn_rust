@@ -11,3 +11,4 @@ pub static SECRET: LazyLock<Vec<u8>> = LazyLock::new(|| {
         .unwrap_or_else(|_| "default_secret".to_string())
         .into_bytes()
 });
+
