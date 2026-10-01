@@ -4,7 +4,7 @@
 // rather than a panic; `exp` is one hour out and jsonwebtoken enforces it when
 // a token is later decoded.
 
-use crate::auth::SECRET;
+use crate::auth::{Claims, SECRET};
 use axum::{Json, http::StatusCode};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{EncodingKey, Header, encode};
@@ -14,12 +14,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize)]
 pub struct LoginReq {
     user_id: u32,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Claims {
-    pub sub: String,
-    pub exp: usize,
 }
 
 #[derive(Serialize)]
